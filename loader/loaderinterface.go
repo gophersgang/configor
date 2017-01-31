@@ -10,3 +10,9 @@ type ConfigLoader interface {
 type ConfigDumper interface {
 	Dump(config interface{}, file string) error // serializes config to file
 }
+
+// ConfigAll is a combined interface
+type ConfigAll interface {
+	ConfigDumper
+	ConfigLoader
+}
