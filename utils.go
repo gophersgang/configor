@@ -102,12 +102,11 @@ func processTags(config interface{}, prefixes ...string) error {
 			fieldStruct = configType.Field(i)
 			field       = configValue.Field(i)
 		)
-		field = reflect.Indirect(field)
+		field = reflect.Indirect(field) // so we dont deal with pointers
 		err := processTag(&fieldStruct, &field, &prefixes)
 		if err != nil {
 			return err
 		}
-
 	}
 	return nil
 }
@@ -209,5 +208,4 @@ func envNames(fieldStruct *reflect.StructField, prefixes *[]string) []string {
 		res = []string{envName}
 	}
 	return res
-
 }
