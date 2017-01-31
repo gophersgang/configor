@@ -82,11 +82,11 @@ func processFile(config interface{}, file string) error {
 	return loader.PlainLoad(config, file)
 }
 
-func getPrefixForStruct(prefixes []string, fieldStruct *reflect.StructField) []string {
+func getPrefixForStruct(prefixes *[]string, fieldStruct *reflect.StructField) []string {
 	if fieldStruct.Anonymous && fieldStruct.Tag.Get("anonymous") == "true" {
-		return prefixes
+		return *prefixes
 	}
-	return append(prefixes, fieldStruct.Name)
+	return append(*prefixes, fieldStruct.Name)
 }
 
 func processTags(config interface{}, prefixes ...string) error {
@@ -96,59 +96,80 @@ func processTags(config interface{}, prefixes ...string) error {
 	}
 
 	configType := configValue.Type()
+
 	for i := 0; i < configType.NumField(); i++ {
 		var (
-			envNames    []string
 			fieldStruct = configType.Field(i)
 			field       = configValue.Field(i)
-			envName     = fieldStruct.Tag.Get("env") // read configuration from shell env
 		)
-
-		if envName == "" {
-			envNames = append(envNames, strings.Join(append(prefixes, fieldStruct.Name), "_"))                  // Configor_DB_Name
-			envNames = append(envNames, strings.ToUpper(strings.Join(append(prefixes, fieldStruct.Name), "_"))) // CONFIGOR_DB_NAME
-		} else {
-			envNames = []string{envName}
-		}
-
-		// Load From Shell ENV
-		for _, env := range envNames {
-			if value := os.Getenv(env); value != "" {
-				if err := yaml.Unmarshal([]byte(value), field.Addr().Interface()); err != nil {
-					return err
-				}
-				break
-			}
-		}
-
-		if isBlank := reflect.DeepEqual(field.Interface(), reflect.Zero(field.Type()).Interface()); isBlank {
-			// Set default configuration if blank
-			if value := fieldStruct.Tag.Get("default"); value != "" {
-				if err := yaml.Unmarshal([]byte(value), field.Addr().Interface()); err != nil {
-					return err
-				}
-			} else if fieldStruct.Tag.Get("required") == "true" {
-				// return error if it is required but blank
-				return errors.New(fieldStruct.Name + " is required, but blank")
-			}
-		}
 		field = reflect.Indirect(field)
+		err := processTag(&fieldStruct, &field, &prefixes)
+		if err != nil {
+			return err
+		}
 
-		if field.Kind() == reflect.Struct {
-			if err := processTags(field.Addr().Interface(), getPrefixForStruct(prefixes, &fieldStruct)...); err != nil {
+	}
+	return nil
+}
+
+func processTag(fieldStruct *reflect.StructField, field *reflect.Value, prefixes *[]string) error {
+	envNames := envNames(fieldStruct, prefixes)
+
+	// Load From Shell ENV
+	for _, env := range envNames {
+		if value := os.Getenv(env); value != "" {
+			err := yaml.Unmarshal([]byte(value), field.Addr().Interface())
+			if err != nil {
 				return err
 			}
+			break
 		}
+	}
 
-		if field.Kind() == reflect.Slice {
-			for i := 0; i < field.Len(); i++ {
-				if reflect.Indirect(field.Index(i)).Kind() == reflect.Struct {
-					if err := processTags(field.Index(i).Addr().Interface(), append(getPrefixForStruct(prefixes, &fieldStruct), fmt.Sprint(i))...); err != nil {
-						return err
-					}
+	isBlank := reflect.DeepEqual(field.Interface(), reflect.Zero(field.Type()).Interface())
+	if isBlank {
+		// Set default configuration if blank
+		if value := fieldStruct.Tag.Get("default"); value != "" {
+			err := yaml.Unmarshal([]byte(value), field.Addr().Interface())
+			if err != nil {
+				return err
+			}
+		} else if fieldStruct.Tag.Get("required") == "true" {
+			// return error if it is required but blank
+			return errors.New(fieldStruct.Name + " is required, but blank")
+		}
+	}
+
+	if field.Kind() == reflect.Struct {
+		err := processTags(field.Addr().Interface(), getPrefixForStruct(prefixes, fieldStruct)...)
+		if err != nil {
+			return err
+		}
+	}
+
+	if field.Kind() == reflect.Slice {
+		for i := 0; i < field.Len(); i++ {
+			if reflect.Indirect(field.Index(i)).Kind() == reflect.Struct {
+				newPrefixes := append(getPrefixForStruct(prefixes, fieldStruct), fmt.Sprint(i))
+				err := processTags(field.Index(i).Addr().Interface(), newPrefixes...)
+				if err != nil {
+					return err
 				}
 			}
 		}
 	}
 	return nil
+}
+
+func envNames(fieldStruct *reflect.StructField, prefixes *[]string) []string {
+	var res []string
+	envName := fieldStruct.Tag.Get("env") // read configuration from shell env
+	if envName == "" {
+		res = append(res, strings.Join(append(*prefixes, fieldStruct.Name), "_"))                  // Configor_DB_Name
+		res = append(res, strings.ToUpper(strings.Join(append(*prefixes, fieldStruct.Name), "_"))) // CONFIGOR_DB_NAME
+	} else {
+		res = []string{envName}
+	}
+	return res
+
 }
