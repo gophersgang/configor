@@ -132,10 +132,7 @@ func processTags(config interface{}, prefixes ...string) error {
 				return errors.New(fieldStruct.Name + " is required, but blank")
 			}
 		}
-
-		for field.Kind() == reflect.Ptr {
-			field = field.Elem()
-		}
+		field = reflect.Indirect(field)
 
 		if field.Kind() == reflect.Struct {
 			if err := processTags(field.Addr().Interface(), getPrefixForStruct(prefixes, &fieldStruct)...); err != nil {
