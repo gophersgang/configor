@@ -1,16 +1,15 @@
 package configor
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
 	"strings"
 
-	"github.com/BurntSushi/toml"
+	"github.com/gophersgang/configor/loader"
+
 	yaml "gopkg.in/yaml.v1"
 )
 
@@ -75,28 +74,12 @@ func (configor *Configor) getConfigurationFiles(files ...string) []string {
 }
 
 func processFile(config interface{}, file string) error {
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		return err
-	}
-
-	switch {
-	case strings.HasSuffix(file, ".yaml") || strings.HasSuffix(file, ".yml"):
-		return yaml.Unmarshal(data, config)
-	case strings.HasSuffix(file, ".toml"):
-		return toml.Unmarshal(data, config)
-	case strings.HasSuffix(file, ".json"):
-		return json.Unmarshal(data, config)
-	default:
-		if toml.Unmarshal(data, config) != nil {
-			if json.Unmarshal(data, config) != nil {
-				if yaml.Unmarshal(data, config) != nil {
-					return errors.New("failed to decode config")
-				}
-			}
-		}
+	loader := &loader.ChainedLoader{}
+	err := loader.Load(config, file)
+	if err == nil {
 		return nil
 	}
+	return loader.PlainLoad(config, file)
 }
 
 func getPrefixForStruct(prefixes []string, fieldStruct *reflect.StructField) []string {
