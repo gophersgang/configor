@@ -45,12 +45,11 @@ func (configor *Configor) Load(config interface{}, files ...string) error {
 			return err
 		}
 	}
-
-	if prefix := configor.getENVPrefix(config); prefix == "-" {
+	prefix := configor.getENVPrefix(config)
+	if prefix == "-" {
 		return processTags(config)
-	} else {
-		return processTags(config, prefix)
 	}
+	return processTags(config, prefix)
 }
 
 // ENV return environment
