@@ -2,6 +2,7 @@ package loader
 
 import "fmt"
 
+// ChainedLoader allows multiple chained loaders. In future you could plug your own implementation here
 type ChainedLoader struct{}
 
 var (
@@ -9,7 +10,6 @@ var (
 )
 
 func init() {
-	fmt.Println("INIT FOR CHAINED")
 	// default: toml -> json -> yaml
 	myLoaders = append(myLoaders, &Tomlloader{})
 	myLoaders = append(myLoaders, &Jsonloader{})
