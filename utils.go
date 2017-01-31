@@ -154,18 +154,20 @@ func loadFromShellEnv(fieldStruct *reflect.StructField, field *reflect.Value, pr
 
 func setDefaultFromTag(fieldStruct *reflect.StructField, field *reflect.Value) error {
 	isBlank := reflect.DeepEqual(field.Interface(), reflect.Zero(field.Type()).Interface())
+	if !isBlank {
+		return nil
+	}
 
-	if isBlank {
-		// Set default configuration if blank
-		if value := fieldStruct.Tag.Get("default"); value != "" {
-			err := yaml.Unmarshal([]byte(value), field.Addr().Interface())
-			if err != nil {
-				return err
-			}
-		} else if fieldStruct.Tag.Get("required") == "true" {
-			// return error if it is required but blank
-			return errors.New(fieldStruct.Name + " is required, but blank")
+	// Set default configuration
+	defValue := fieldStruct.Tag.Get("default")
+	if defValue != "" {
+		err := yaml.Unmarshal([]byte(defValue), field.Addr().Interface())
+		if err != nil {
+			return err
 		}
+	} else if fieldStruct.Tag.Get("required") == "true" {
+		// return error if it is required but blank
+		return errors.New(fieldStruct.Name + " is required, but blank")
 	}
 	return nil
 }
