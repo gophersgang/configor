@@ -321,6 +321,16 @@ func TestOverwriteConfigurationWithEnvironmentThatSetByConfig(t *testing.T) {
 	}
 }
 
+func TestCouldNotFindAnyFile(t *testing.T) {
+	var result Config
+	var Configor = configor.New(&configor.Config{ENVPrefix: "APP1"})
+	err := Configor.Load(&result, "/tmp/not-here")
+	if err == nil {
+		t.Errorf("should fail reading from non-existing file")
+	}
+
+}
+
 func TestResetPrefixToBlank(t *testing.T) {
 	config := generateDefaultConfig()
 
