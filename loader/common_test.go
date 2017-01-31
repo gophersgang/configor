@@ -122,7 +122,7 @@ func behavesLikeLoaderErrors(t *testing.T, loader loader.ConfigAll, configFile s
 	myType := reflect.TypeOf(loader)
 
 	// YAML parses all kinda of junk... leave it out of this test...
-	if myType.String() != "*loader.Yamlloader" {
+	if myType.String() != "*loader.Yamlloader" && myType.String() != "*loader.ChainedLoader" {
 		// reading junk from existing file
 		ioutil.WriteFile("/tmp/junkfile.txt", []byte("1111 1111 Here is a string...."), 0644)
 		err = loader.PlainLoad(&little, "/tmp/junkfile.txt")
