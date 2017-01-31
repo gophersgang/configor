@@ -7,5 +7,6 @@ go:
 before_install:
   - go get github.com/mattn/goveralls
 script:
-  - go test -v -cover -race   ./...
-  - $HOME/gopath/bin/goveralls -service=travis-ci
+  - ./test.sh
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
