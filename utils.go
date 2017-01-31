@@ -113,6 +113,31 @@ func processTags(config interface{}, prefixes ...string) error {
 }
 
 func processTag(fieldStruct *reflect.StructField, field *reflect.Value, prefixes *[]string) error {
+	var err error
+
+	err = loadFromShellEnv(fieldStruct, field, prefixes)
+	if err != nil {
+		return err
+	}
+
+	err = setDefaultFromTag(fieldStruct, field)
+	if err != nil {
+		return err
+	}
+
+	err = processTagIfStruct(fieldStruct, field, prefixes)
+	if err != nil {
+		return err
+	}
+
+	err = processTagIfSlice(fieldStruct, field, prefixes)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func loadFromShellEnv(fieldStruct *reflect.StructField, field *reflect.Value, prefixes *[]string) error {
 	envNames := envNames(fieldStruct, prefixes)
 
 	// Load From Shell ENV
@@ -125,8 +150,12 @@ func processTag(fieldStruct *reflect.StructField, field *reflect.Value, prefixes
 			break
 		}
 	}
+	return nil
+}
 
+func setDefaultFromTag(fieldStruct *reflect.StructField, field *reflect.Value) error {
 	isBlank := reflect.DeepEqual(field.Interface(), reflect.Zero(field.Type()).Interface())
+
 	if isBlank {
 		// Set default configuration if blank
 		if value := fieldStruct.Tag.Get("default"); value != "" {
@@ -139,22 +168,31 @@ func processTag(fieldStruct *reflect.StructField, field *reflect.Value, prefixes
 			return errors.New(fieldStruct.Name + " is required, but blank")
 		}
 	}
+	return nil
+}
 
-	if field.Kind() == reflect.Struct {
-		err := processTags(field.Addr().Interface(), getPrefixForStruct(prefixes, fieldStruct)...)
-		if err != nil {
-			return err
-		}
+func processTagIfStruct(fieldStruct *reflect.StructField, field *reflect.Value, prefixes *[]string) error {
+	if field.Kind() != reflect.Struct {
+		return nil
 	}
 
-	if field.Kind() == reflect.Slice {
-		for i := 0; i < field.Len(); i++ {
-			if reflect.Indirect(field.Index(i)).Kind() == reflect.Struct {
-				newPrefixes := append(getPrefixForStruct(prefixes, fieldStruct), fmt.Sprint(i))
-				err := processTags(field.Index(i).Addr().Interface(), newPrefixes...)
-				if err != nil {
-					return err
-				}
+	err := processTags(field.Addr().Interface(), getPrefixForStruct(prefixes, fieldStruct)...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func processTagIfSlice(fieldStruct *reflect.StructField, field *reflect.Value, prefixes *[]string) error {
+	if field.Kind() != reflect.Slice {
+		return nil
+	}
+	for i := 0; i < field.Len(); i++ {
+		if reflect.Indirect(field.Index(i)).Kind() == reflect.Struct {
+			newPrefixes := append(getPrefixForStruct(prefixes, fieldStruct), fmt.Sprint(i))
+			err := processTags(field.Index(i).Addr().Interface(), newPrefixes...)
+			if err != nil {
+				return err
 			}
 		}
 	}
